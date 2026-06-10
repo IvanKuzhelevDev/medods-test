@@ -1,0 +1,379 @@
+---
+openapi: 3.0.1
+info:
+  title: МИС — Трекер задач API
+  version: v1
+  description: 'API модуля трекера рабочих задач для персонала МИС: задачи, теги и
+    повторяющиеся вхождения (календарь).'
+paths:
+  "/api/v1/occurrences":
+    get:
+      summary: 'Календарь: вхождения за период'
+      tags:
+      - Вхождения
+      parameters:
+      - name: from
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+        description: Начало окна (по умолчанию — начало текущего месяца)
+      - name: to
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+        description: Конец окна (по умолчанию — конец текущего месяца)
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - new
+          - in_progress
+          - done
+          - canceled
+      - name: tag
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: список вхождений
+  "/api/v1/tasks/{task_id}/occurrences/{date}":
+    parameters:
+    - name: task_id
+      in: path
+      description: ID задачи (серии)
+      required: true
+      schema:
+        type: integer
+    - name: date
+      in: path
+      description: Дата вхождения (YYYY-MM-DD) — якорь слота
+      required: true
+      schema:
+        type: string
+    patch:
+      summary: Изменить один экземпляр (выполнить / перенести / править)
+      tags:
+      - Вхождения
+      parameters: []
+      responses:
+        '200':
+          description: экземпляр обновлён
+        '422':
+          description: дата не входит в расписание серии
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                occurrence:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                      enum:
+                      - new
+                      - in_progress
+                      - done
+                      - canceled
+                    scheduled_at:
+                      type: string
+                      format: date-time
+                      description: Перенос на другое время
+                    title:
+                      type: string
+                    description:
+                      type: string
+                    canceled:
+                      type: boolean
+    delete:
+      summary: Отменить один экземпляр (пропустить день)
+      tags:
+      - Вхождения
+      responses:
+        '200':
+          description: экземпляр отменён
+  "/api/v1/tags":
+    get:
+      summary: Список тегов
+      tags:
+      - Теги
+      responses:
+        '200':
+          description: список тегов
+    post:
+      summary: Создать пользовательский тег
+      tags:
+      - Теги
+      parameters: []
+      responses:
+        '201':
+          description: тег создан
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - tag
+              properties:
+                tag:
+                  type: object
+                  required:
+                  - name
+                  properties:
+                    name:
+                      type: string
+                      example: обход
+  "/api/v1/tags/{id}":
+    parameters:
+    - name: id
+      in: path
+      description: ID тега
+      required: true
+      schema:
+        type: integer
+    patch:
+      summary: Переименовать тег (системные — запрещено)
+      tags:
+      - Теги
+      parameters: []
+      responses:
+        '200':
+          description: переименован
+        '422':
+          description: системный тег изменять нельзя
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tag:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+    delete:
+      summary: Удалить тег (системные — запрещено)
+      tags:
+      - Теги
+      responses:
+        '204':
+          description: удалён
+        '422':
+          description: системный тег удалять нельзя
+  "/api/v1/tasks/{task_id}/tags":
+    parameters:
+    - name: task_id
+      in: path
+      description: ID задачи
+      required: true
+      schema:
+        type: integer
+    post:
+      summary: Добавить тег задаче
+      tags:
+      - Теги
+      parameters: []
+      responses:
+        '201':
+          description: тег добавлен
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - tag_id
+              properties:
+                tag_id:
+                  type: integer
+  "/api/v1/tasks/{task_id}/tags/{id}":
+    parameters:
+    - name: task_id
+      in: path
+      description: ID задачи
+      required: true
+      schema:
+        type: integer
+    - name: id
+      in: path
+      description: ID тега
+      required: true
+      schema:
+        type: integer
+    delete:
+      summary: Снять тег с задачи
+      tags:
+      - Теги
+      responses:
+        '204':
+          description: тег снят
+  "/api/v1/tasks":
+    get:
+      summary: Список задач (определений серий)
+      tags:
+      - Задачи
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - new
+          - in_progress
+          - done
+          - canceled
+        description: Фильтр по статусу
+      - name: tag
+        in: query
+        required: false
+        schema:
+          type: string
+        description: Фильтр по имени тега
+      responses:
+        '200':
+          description: список задач
+    post:
+      summary: Создать задачу
+      tags:
+      - Задачи
+      parameters: []
+      responses:
+        '201':
+          description: задача создана
+        '422':
+          description: ошибка валидации
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - task
+              properties:
+                task:
+                  type: object
+                  required:
+                  - title
+                  - recurrence_type
+                  properties:
+                    title:
+                      type: string
+                      example: Обзвон пациентов
+                    description:
+                      type: string
+                    status:
+                      type: string
+                      enum:
+                      - new
+                      - in_progress
+                      - done
+                      - canceled
+                    recurrence_type:
+                      type: string
+                      enum:
+                      - once
+                      - daily
+                      - monthly
+                      - specific_dates
+                      - parity
+                    recurrence_interval:
+                      type: integer
+                      example: 1
+                      description: 'для daily: каждый n-й день'
+                    days_of_month:
+                      type: array
+                      items:
+                        type: integer
+                      description: 'для monthly: числа 1..31'
+                    specific_dates:
+                      type: array
+                      items:
+                        type: string
+                        format: date
+                    parity:
+                      type: string
+                      enum:
+                      - even
+                      - odd
+                      description: 'для parity: чётные/нечётные дни'
+                    starts_on:
+                      type: string
+                      format: date
+                      example: '2026-06-01'
+                    ends_on:
+                      type: string
+                      format: date
+                      description: null = бессрочно
+                    due_time:
+                      type: string
+                      example: '10:00'
+                    tag_ids:
+                      type: array
+                      items:
+                        type: integer
+  "/api/v1/tasks/{id}":
+    parameters:
+    - name: id
+      in: path
+      description: ID задачи
+      required: true
+      schema:
+        type: integer
+    get:
+      summary: Показать задачу
+      tags:
+      - Задачи
+      responses:
+        '200':
+          description: задача
+        '404':
+          description: не найдена
+    patch:
+      summary: Обновить задачу (всю серию)
+      tags:
+      - Задачи
+      parameters: []
+      responses:
+        '200':
+          description: обновлена
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                task:
+                  type: object
+                  properties:
+                    title:
+                      type: string
+                    description:
+                      type: string
+                    status:
+                      type: string
+                      enum:
+                      - new
+                      - in_progress
+                      - done
+                      - canceled
+    delete:
+      summary: Удалить задачу
+      tags:
+      - Задачи
+      responses:
+        '204':
+          description: удалена
+servers:
+- url: http://localhost:3000
